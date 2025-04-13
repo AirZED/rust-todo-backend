@@ -1,34 +1,70 @@
-use crate::entities::todo::{ActiveModel as TodoActiveModel, Entity as Todo, Model as TodoModel};
-use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response, Json};
+use axum::{extract::{Json, Path}, http::StatusCode, response::IntoResponse};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use serde::Deserialize;
 
-use crate::db::get_connection;
-
-pub async fn get_todos(_req: Request, _next: Next) -> Result<Response, StatusCode> {
-    let db = get_connection()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let todos = Todo::find()
-        .all(db)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let todo_json = serde_json::to_string(&todos).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .body(todo_json.into())
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    Ok(response)
-}
-pub async fn get_single_todo() {
-
+#[derive(Deserialize)]
+pub struct CreateTodoRequest {
+    pub title: String,
+    pub completed: bool,
 }
 
-pub async fn create_todo() {}
+#[derive(Deserialize)]
+pub struct UpdateTodoRequest {
+    pub title: Option<String>,
+    pub completed: Option<bool>,
+}
 
-pub async fn update_todo() {}
+use crate::{
+    db::get_connection,
+    entities::todo::{ActiveModel as TodoActiveModel, Entity as Todo, Model as TodoModel},
+};
 
-pub async fn delete_todo() {}
+pub async fn get_todos() -> Result<impl IntoResponse, StatusCode> {
+    let db = get_connection().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let todos = Todo::find().all(db).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(todos))
+}
+
+pub async fn get_single_todo(Path(id): Path<i32>) -> Result<impl IntoResponse, StatusCode> {
+    let db = get_connection().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let todo = Todo::find_by_id(id).one(db).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(todo))
+}
+
+pub async fn create_todo(Json(payload): Json<CreateTodoRequest>) -> Result<impl IntoResponse, StatusCode> {
+    let db = get_connection().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let new_todo = TodoActiveModel {
+        title: Set(payload.title),
+        completed: Set(payload.completed),
+        ..Default::default()
+    };
+    let inserted = new_todo.insert(db).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((StatusCode::CREATED, Json(inserted)))
+}
+
+pub async fn update_todo(
+    Path(id): Path<i32>,
+    Json(payload): Json<UpdateTodoRequest>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let db = get_connection().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Some(todo) = Todo::find_by_id(id).one(db).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+        let mut active: TodoActiveModel = todo.into();
+        if let Some(title) = payload.title {
+            active.title = Set(title);
+        }
+        if let Some(completed) = payload.completed {
+            active.completed = Set(completed);
+        }
+        let updated = active.update(db).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Json(updated))
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
+}
+
+pub async fn delete_todo(Path(id): Path<i32>) -> Result<impl IntoResponse, StatusCode> {
+    let db = get_connection().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Todo::delete_by_id(id).exec(db).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(StatusCode::NO_CONTENT)
+}

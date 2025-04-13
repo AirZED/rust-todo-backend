@@ -6,6 +6,7 @@ mod config;
 mod controllers;
 mod db;
 mod entities;
+mod utils;
 
 use config::Config;
 use controllers::auth::{login, signup};
@@ -19,7 +20,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let app = Router::new()
-        .route("/todo/", get(get_todos).post(create_todo))
+        .route("/todo", get(get_todos).post(create_todo))
         .route(
             "/todo/{id}",
             get(get_single_todo).patch(update_todo).delete(delete_todo),
