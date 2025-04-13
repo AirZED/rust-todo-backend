@@ -5,10 +5,12 @@ use axum::{routing::get, Router};
 mod config;
 mod controllers;
 mod db;
+mod entities;
 
 use config::Config;
 use controllers::auth::{login, signup};
-use controllers::todo::{create_todo, delete_todo, get_single_todo, update_todo};
+use controllers::todo::{create_todo, delete_todo, get_single_todo, get_todos, update_todo};
+use db::init_db;
 use tracing::info;
 
 #[tokio::main]
@@ -17,7 +19,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let app = Router::new()
-        // .route("/todo/", get(get_todos).post(create_todo))
+        .route("/todo/", get(get_todos).post(create_todo))
         .route(
             "/todo/{id}",
             get(get_single_todo).patch(update_todo).delete(delete_todo),
@@ -28,6 +30,7 @@ async fn main() {
     let port = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, config.port);
     let listener = tokio::net::TcpListener::bind(port).await.unwrap();
 
+    init_db().await.expect("Failed to connect to the database");
     info!("🚀 Starting server at {}", port);
     axum::serve(listener, app).await.unwrap();
 }
