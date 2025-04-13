@@ -1,4 +1,8 @@
-pub async fn get_todos() {}
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
+
+// pub async fn get_todos(req: Request, next: Next) -> Result<Response, StatusCode> {
+//     Ok(StatusCode::OK)
+// }
 
 pub async fn get_single_todo() {}
 
