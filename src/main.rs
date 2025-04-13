@@ -20,6 +20,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let app = Router::new()
+        .route("/", get("Server is working properly"))
         .route("/todo", get(get_todos).post(create_todo))
         .route(
             "/todo/{id}",
