@@ -10,6 +10,7 @@ pub struct Model {
     pub name: String,
     #[sea_orm(unique)]
     pub email: String,
+    pub password: String,
     #[sea_orm(column_type = "Binary(16)", unique)]
     pub uuid: Vec<u8>,
     pub created_at: DateTime,

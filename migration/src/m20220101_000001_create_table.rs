@@ -14,11 +14,12 @@ impl MigrationTrait for Migration {
                     .col(pk_auto(User::Id))
                     .col(string(User::Name).string().not_null())
                     .col(string(User::Email).string().unique_key().not_null())
+                    .col(ColumnDef::new(User::Password).string().not_null())
                     .col(ColumnDef::new(User::Uuid).uuid().unique_key().not_null())
                     .col(ColumnDef::new(User::CreatedAt).date_time().not_null())
                     .to_owned(),
             )
-            .await 
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -34,6 +35,7 @@ enum User {
     Id,
     Name,
     Email,
+    Password,
     Uuid,
     CreatedAt,
 }
