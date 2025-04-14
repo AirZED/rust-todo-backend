@@ -20,7 +20,7 @@ pub struct UpdateTodoRequest {
 
 use crate::{
     db::get_connection,
-    entities::todo::{ActiveModel as TodoActiveModel, Entity as Todo},
+    models::todo::{ActiveModel as TodoActiveModel, Entity as Todo},
 };
 
 pub async fn get_todos() -> Result<impl IntoResponse, StatusCode> {

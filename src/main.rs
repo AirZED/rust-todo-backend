@@ -3,15 +3,17 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::post;
+use axum::Json;
 use axum::{routing::get, Router};
 use chrono::Utc;
 use entity::user;
+use models::user::CreateUserModel;
 use uuid::Uuid;
 
 mod config;
 mod controllers;
 mod db;
-mod entities;
+mod models;
 mod routes;
 mod utils;
 
@@ -47,15 +49,15 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn create_user() -> impl IntoResponse {
+async fn create_user(Json(user_data): Json<CreateUserModel>) -> impl IntoResponse {
     let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
         .await
         .unwrap();
 
     let user_model = user::ActiveModel {
-        name: Set("Mfoniso".to_owned()),
-        email: Set("mfoniso@gmail.com".to_owned()),
-        password: Set("password".to_owned()),
+        name: Set(user_data.name.to_owned()),
+        email: Set(user_data.email.to_owned()),
+        password: Set(user_data.password.to_owned()),
         uuid: Set(Uuid::new_v4().into()),
         created_at: Set(Utc::now().naive_utc()),
         ..Default::default()
@@ -63,6 +65,7 @@ async fn create_user() -> impl IntoResponse {
 
     let user = user_model.insert(&db).await.unwrap();
 
+    db.close().await.unwrap();
     (
         StatusCode::ACCEPTED,
         format!("User created successfully: {}", user.id),
