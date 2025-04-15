@@ -8,13 +8,14 @@ use axum::Json;
 use axum::{routing::get, Router};
 use chrono::Utc;
 use entity::user;
-use migration::Mode;
+use error::ApiError;
 use models::user::{CreateUserModel, ReadUserModel, UpdateUserModel, UserModel};
 use uuid::Uuid;
 
 mod config;
 mod controllers;
 mod db;
+mod error;
 mod models;
 mod routes;
 mod utils;
@@ -103,25 +104,25 @@ async fn login_user(Json(user_data): Json<ReadUserModel>) -> impl IntoResponse {
 }
 
 async fn update_user(
-    Path(uuid): Path<Uuid>,
+    Path(uuid): Path<String>,
     Json(user_data): Json<UpdateUserModel>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, ApiError> {
     let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
         .await
-        .unwrap();
+        .map_err(|e| ApiError::DatabaseConnectionError(e.to_string()))?;
 
-    let mut user: user::ActiveModel = user::Entity::find()
+    let user_result = user::Entity::find()
         .filter(user::Column::Uuid.eq(uuid))
         .one(&db)
-        .await
-        .unwrap()
-        .unwrap()
-        .into();
-    // the into here converts it to the type that is written above
+        .await?;
+
+    let user_model = user_result.ok_or(ApiError::UserNotFound)?;
+
+    let mut user: user::ActiveModel = user_model.into();
 
     user.name = Set(user_data.name.to_owned());
 
-    user.update(&db).await.unwrap();
+    user.update(&db).await?;
 
-    (StatusCode::ACCEPTED, "Updated user")
+    Ok((StatusCode::OK, "User updated successfully"))
 }
