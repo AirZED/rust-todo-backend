@@ -26,7 +26,7 @@ pub struct ReadUserModel {
 
 #[derive(Serialize, Deserialize)]
 pub struct UpdateUserModel {
-    pub name: String,
+    pub name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]

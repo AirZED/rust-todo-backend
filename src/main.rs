@@ -43,7 +43,7 @@ async fn main() {
         )
         .route("/auth/login", post(login_user))
         .route("/auth/signup", post(create_user))
-        .route("/user/update_user", patch(update_user));
+        .route("/user/update_user/{uuid}", patch(update_user));
 
     let port = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, config.port);
     let listener = tokio::net::TcpListener::bind(port).await.unwrap();
@@ -80,6 +80,9 @@ async fn login_user(Json(user_data): Json<ReadUserModel>) -> impl IntoResponse {
         .await
         .unwrap();
 
+    // this fetches users
+    // let users = user::Entity::find().all(&db).await?;
+
     let user = user::Entity::find()
         .filter(
             Condition::all()
@@ -112,7 +115,7 @@ async fn update_user(
         .map_err(|e| ApiError::DatabaseConnectionError(e.to_string()))?;
 
     let user_result = user::Entity::find()
-        .filter(user::Column::Uuid.eq(uuid))
+        .filter(user::Column::Uuid.eq(Uuid::parse_str(&uuid).unwrap()))
         .one(&db)
         .await?;
 
@@ -120,9 +123,26 @@ async fn update_user(
 
     let mut user: user::ActiveModel = user_model.into();
 
-    user.name = Set(user_data.name.to_owned());
+    if let Some(name) = user_data.name {
+        user.name = Set(name);
+    }
+    // add if for other fields
 
     user.update(&db).await?;
 
     Ok((StatusCode::OK, "User updated successfully"))
 }
+
+// async fn delete_user(Path(uuid): Path<String>) -> Result<impl IntoResponse, ApiError> {
+//     let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
+//         .await
+//         .map_err(|e| ApiError::DatabaseConnectionError(e.to_string()))?;
+
+//     let user_result = user::Entity::find()
+//         .filter(user::Column::Uuid.eq(Uuid::parse_str(&uuid).unwrap()))
+//         .one(&db)
+//         .await?;
+
+//     let user_model = user_result.ok_or(ApiError::UserNotFound)?;
+
+// }
