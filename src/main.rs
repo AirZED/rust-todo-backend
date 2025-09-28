@@ -179,16 +179,50 @@ async fn update_user(
     Ok((StatusCode::OK, "User updated successfully"))
 }
 
-// async fn delete_user(Path(uuid): Path<String>) -> Result<impl IntoResponse, ApiError> {
-//     let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
-//         .await
-//         .map_err(|e| ApiError::DatabaseConnectionError(e.to_string()))?;
+async fn delete_user(Path(uuid): Path<String>) -> impl IntoResponse {
+    let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
+        .await
+        .unwrap();
 
-//     let user_result = user::Entity::find()
-//         .filter(user::Column::Uuid.eq(Uuid::parse_str(&uuid).unwrap()))
-//         .one(&db)
-//         .await?;
+    let user_result = user::Entity::find()
+        .filter(user::Column::Uuid.eq(Uuid::parse_str(&uuid).unwrap()))
+        .one(&db)
+        .await;
 
-//     let user_model = user_result.ok_or(ApiError::UserNotFound)?;
+    let user = match user_result {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(MessageResponse {
+                    message: "User not found".to_string(),
+                }),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(MessageResponse {
+                    message: e.to_string(),
+                }),
+            );
+        }
+    };
 
-// }
+    
+    if let Err(e) = user::Entity::delete_by_id(user.id).exec(&db).await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(MessageResponse {
+                message: e.to_string(),
+            }),
+        );
+    }
+
+    (
+        StatusCode::OK,
+        Json(MessageResponse {
+            message: "User deleted successfully".to_string(),
+        }),
+    )
+}
