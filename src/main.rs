@@ -58,15 +58,16 @@ struct MessageResponse {
     message: String,
 }
 
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum LoginResponse {
+    Success(UserModel),
+    Failure(MessageResponse),
+}
 async fn create_user(Json(user_data): Json<CreateUserModel>) -> impl IntoResponse {
-    let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
-        .await
-        .unwrap();
-
     match user_data.validate() {
         Ok(_) => (),
         Err(e) => {
-            db.close().await.unwrap();
             return (
                 StatusCode::BAD_REQUEST,
                 Json(MessageResponse {
@@ -75,6 +76,9 @@ async fn create_user(Json(user_data): Json<CreateUserModel>) -> impl IntoRespons
             );
         }
     }
+    let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
+        .await
+        .unwrap();
 
     let existing_user = user::Entity::find()
         .filter(Condition::all().add(user::Column::Email.eq(user_data.email.to_owned())));
@@ -110,6 +114,17 @@ async fn create_user(Json(user_data): Json<CreateUserModel>) -> impl IntoRespons
     )
 }
 async fn login_user(Json(user_data): Json<ReadUserModel>) -> impl IntoResponse {
+    match user_data.validate() {
+        Ok(_) => (),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(LoginResponse::Failure(MessageResponse {
+                    message: e.to_string(),
+                })),
+            );
+        }
+    }
     let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
         .await
         .unwrap();
@@ -134,7 +149,7 @@ async fn login_user(Json(user_data): Json<ReadUserModel>) -> impl IntoResponse {
     };
 
     db.close().await.unwrap();
-    (StatusCode::ACCEPTED, Json(data))
+    (StatusCode::ACCEPTED, Json(LoginResponse::Success(data)))
 }
 
 async fn update_user(
