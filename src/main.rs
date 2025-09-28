@@ -53,10 +53,42 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
+#[derive(serde::Serialize)]
+struct MessageResponse {
+    message: String,
+}
+
 async fn create_user(Json(user_data): Json<CreateUserModel>) -> impl IntoResponse {
     let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
         .await
         .unwrap();
+
+    match user_data.validate() {
+        Ok(_) => (),
+        Err(e) => {
+            db.close().await.unwrap();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(MessageResponse {
+                    message: e.to_string(),
+                }),
+            );
+        }
+    }
+
+    let existing_user = user::Entity::find()
+        .filter(Condition::all().add(user::Column::Email.eq(user_data.email.to_owned())));
+
+    if let Some(_) = existing_user.one(&db).await.unwrap() {
+        db.close().await.unwrap();
+
+        return (
+            StatusCode::CONFLICT,
+            Json(MessageResponse {
+                message: "User with this email already exists".to_string(),
+            }),
+        );
+    };
 
     let user_model = user::ActiveModel {
         name: Set(user_data.name.to_owned()),
@@ -72,16 +104,15 @@ async fn create_user(Json(user_data): Json<CreateUserModel>) -> impl IntoRespons
     db.close().await.unwrap();
     (
         StatusCode::ACCEPTED,
-        format!("User created successfully: {}", user.id),
+        Json(MessageResponse {
+            message: format!("User created successfully: {}", user.id),
+        }),
     )
 }
 async fn login_user(Json(user_data): Json<ReadUserModel>) -> impl IntoResponse {
     let db: DatabaseConnection = Database::connect("mysql://root:%23%23%23@localhost:3306/todo_db")
         .await
         .unwrap();
-
-    // this fetches users
-    // let users = user::Entity::find().all(&db).await?;
 
     let user = user::Entity::find()
         .filter(
