@@ -3,9 +3,8 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{patch, post};
+use axum::routing::{delete, get, patch, post, Router};
 use axum::Json;
-use axum::{routing::get, Router};
 use chrono::Utc;
 use entity::user;
 use error::ApiError;
@@ -43,7 +42,8 @@ async fn main() {
         )
         .route("/auth/login", post(login_user))
         .route("/auth/signup", post(create_user))
-        .route("/user/update_user/{uuid}", patch(update_user));
+        .route("/user/update_user/{uuid}", patch(update_user))
+        .route("/user/delete_user/{uuid}", delete(delete_user));
 
     let port = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, config.port);
     let listener = tokio::net::TcpListener::bind(port).await.unwrap();
@@ -209,7 +209,6 @@ async fn delete_user(Path(uuid): Path<String>) -> impl IntoResponse {
         }
     };
 
-    
     if let Err(e) = user::Entity::delete_by_id(user.id).exec(&db).await {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
